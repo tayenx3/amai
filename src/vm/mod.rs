@@ -177,10 +177,7 @@ impl<'vm> AmaiVM<'vm> {
                 frame.registers[dest as usize] = src.lnot();
                 frame.ip = frame.ip.wrapping_add(3);
             },
-            HALT => {
-                println!("PROGRAM FINISHED\nFIRST 5 REGISTERS OF FRAME: {:?}", &frame.registers[0..5].iter().map(|s| s.to_int()).collect::<Vec<_>>());
-                self.running = false
-            },
+            HALT => self.running = false,
             _ => todo!(),
         }
 
@@ -196,6 +193,7 @@ pub struct CallFrame<'cf> {
     pub ip: *const u8,
 }
 
+#[allow(unused)]
 #[derive(Clone, Copy)]
 pub struct Function<'func> {
     pub constant_count: usize,
