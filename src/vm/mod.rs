@@ -2,14 +2,16 @@ pub mod value;
 pub mod inst;
 pub mod function;
 pub mod call_frame;
+pub mod arena;
 
 use std::rc::Rc;
 use value::*;
 use inst::*;
 use function::Function;
 use call_frame::CallFrame;
+use arena::Arena;
 
-use crate::common::Span;
+use crate::{codegen::value::ValueBuilder, common::Span};
 
 pub struct AmaiVM {
     pub frames: Vec<CallFrame>,
@@ -18,18 +20,34 @@ pub struct AmaiVM {
     pub functions: Vec<Rc<Function>>,
     pub allow_large_bytecode: bool,
     pub external_functions: Vec<Rc<dyn Fn(&mut AmaiVM, &[Value])>>,
+    pub arena: Arena,
 }
 
 impl AmaiVM {
-    pub fn new(constants: Box<[Value]>, allow_large_bytecode: bool) -> Self {
+    pub fn new(allow_large_bytecode: bool) -> Self {
         Self {
             frames: Vec::new(),
-            constants,
+            constants: Box::new([]),
             running: false,
             functions: Vec::new(),
             allow_large_bytecode,
             external_functions: Vec::new(),
+            arena: Arena::new(),
         }
+    }
+
+    pub fn precompile_constants(&mut self, constants: Box<[ValueBuilder]>) {
+        let mut new_constants = Vec::new();
+        for value in constants {
+            if value.is_large() {
+                let addr = self.arena.alloc(value.size(), value.align());
+                self.arena.write(addr, &value.data());
+                new_constants.push(Value::from_ptr(addr));
+            } else {
+                new_constants.push(value.to_value());
+            }
+        }
+        self.constants = new_constants.into_boxed_slice();
     }
 
     #[allow(unused)]
@@ -347,6 +365,12 @@ impl AmaiVM {
                 let src2 = (*frame).registers[((inst >> 24) & 0xFF) as usize];
 
                 (*frame).registers[((inst >> 8) & 0xFF) as usize] = src1.rshf(src2).map_err(|err| (err, *span))?;
+            },
+            SCON => {
+                let src1 = (*frame).registers[((inst >> 16) & 0xFF) as usize];
+                let src2 = (*frame).registers[((inst >> 24) & 0xFF) as usize];
+
+                (*frame).registers[((inst >> 8) & 0xFF) as usize] = src1.scon(src2, &mut self.arena).map_err(|err| (err, *span))?;
             },
             HALT => self.running = false,
             _ => panic!("Unknown opcode: {opcode:#04X}"),

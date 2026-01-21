@@ -74,23 +74,23 @@ pub fn run_path(input: &str, show_bytecode: bool) -> Result<(), String> {
     let mut astc = codegen::ASTCompiler::new();
     let f = astc.compile(&ast);
     
-    let mut vm = vm::AmaiVM::new(astc.constants(), false);
-
     if show_bytecode {
         let disassembled = tools::bytecode_disassembler::disassemble(&f.iter().map(|s| s.0).collect::<Vec<_>>());
         println!("{disassembled}");
     }
+    
+    let mut vm = vm::AmaiVM::new(false);
+    vm.precompile_constants(astc.constants.into_boxed_slice());
 
     vm.add_function(f.into_boxed_slice());
     vm.call_function(0, Box::new([]));
-    let current = std::time::Instant::now();
     vm.run().map_err(|(err, span)| {
         let diag = diagnostic::Diagnostic::new(&input, format!("{err}. Traced error happened here:"), span);
         let lines = contents.lines().collect::<Vec<_>>();
         let line_starts = line_starts(&contents);
         diag.display(&line_starts, &lines)
     })?;
-    println!("Program ended in {:.2}s", current.elapsed().as_secs_f32());
+    let frame = vm.frames.last().unwrap();
     vm.return_function();
 
     Ok(())

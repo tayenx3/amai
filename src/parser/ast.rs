@@ -13,6 +13,7 @@ pub struct ASTModule {
 pub enum ASTNodeType {
     IntLit(i64),
     FloatLit(f64),
+    StringLit(String),
     Boolean(bool),
     Identifier(String),
     Semi(Box<ASTNode>),
@@ -46,6 +47,12 @@ pub enum ASTNodeType {
     },
     While {
         condition: Box<ASTNode>,
+        body: Box<ASTNode>,
+    },
+    FunDef {
+        name: String,
+        args: Vec<(String, Option<FrontendType>, Span)>,
+        return_ty: Option<FrontendType>,
         body: Box<ASTNode>,
     },
 }

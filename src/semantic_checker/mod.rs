@@ -115,6 +115,15 @@ impl SemanticChecker {
             FrontendTypeType::Vector(vec) => Ok(Type::Vector(Box::new(self.resolve_type(vec)?))),
         }
     }
+    
+    /*fn collect_functions(&mut self, node: &ASTNode) -> Result<(), Diagnostic> {
+        match &node.ty {
+            ASTNodeType::FunDef { name, args, return_ty, body } => {
+                self.define_symbol(name, Type::Func(, ()), mutability, is_unitialized, defined_at);
+            }
+            _ => {},
+        }
+    }*/
 
     pub fn validate(&mut self, ast: &mut ASTModule) -> Result<(), Vec<Diagnostic>> {
         let mut diagnostics = Vec::new();
@@ -136,6 +145,7 @@ impl SemanticChecker {
         match &mut node.ty {
             ASTNodeType::IntLit(_) => Ok(Type::Int),
             ASTNodeType::FloatLit(_) => Ok(Type::Float),
+            ASTNodeType::StringLit(_) => Ok(Type::String),
             ASTNodeType::Boolean(_) => Ok(Type::Bool),
             ASTNodeType::Identifier(s) => self
                 .find_symbol(s, node.span.clone())
@@ -392,7 +402,9 @@ impl SemanticChecker {
                 if !errors.is_empty() { return Err(errors) }
                 Ok(Type::Unit)
             },
-            //_ => todo!("{:#?}", node.ty),
+            ASTNodeType::FunDef { name, args, return_ty, body } => {
+                Ok(Type::Unit)
+            },
         }
     }
 }

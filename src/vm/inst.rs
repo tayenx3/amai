@@ -40,4 +40,5 @@ pub const CARG: u8 = 0x26; // copy arg (from caller args)
 pub const CEXT: u8 = 0x27; // call external
 pub const LSHF: u8 = 0x28;
 pub const RSHF: u8 = 0x29;
+pub const SCON: u8 = 0x2A;
 pub const HALT: u8 = 0xFF;

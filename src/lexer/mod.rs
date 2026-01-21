@@ -60,7 +60,6 @@ fn parse_float(string: &str) -> Option<f64> {
 
 fn classify<'lex>(lex: &'lex str, span: Span) -> Option<Token<'lex>> {
     let (ty, lit) = match lex {
-        "func" => (TokenType::Func, None),
         "let" => (TokenType::Let, None),
         "var" => (TokenType::Var, None),
         "if" => (TokenType::If, None),
@@ -158,8 +157,8 @@ pub fn lex<'lex>(path: &str, source: &'lex str) -> Result<Box<[Token<'lex>]>, Di
                 tokens.push(Token {
                     ty: TokenType::StringLit,
                     lit: None,
-                    lex: &source[tok_start..pos],
-                    span: Span::from(tok_start..pos),
+                    lex: &source[(tok_start + 1)..pos],
+                    span: Span::from(tok_start..(pos + 1)),
                 });
                 tok_start = pos + 1;
                 in_string = false;
@@ -203,7 +202,7 @@ pub fn lex<'lex>(path: &str, source: &'lex str) -> Result<Box<[Token<'lex>]>, Di
                         );
                     }
                 }
-                tok_start = pos+1;
+                tok_start = pos;
             },
             _ => {
                 if ch == '.' {

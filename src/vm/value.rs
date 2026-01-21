@@ -1,3 +1,5 @@
+use super::arena::Arena;
+
 #[derive(Debug, Clone, Copy, PartialEq, Hash, Eq)]
 pub struct Value(pub u64);
 
@@ -33,6 +35,15 @@ impl Value {
     #[inline(always)]
     pub fn to_float(&self) -> f64 {
         f64::from_bits(self.0)
+    }
+    
+    #[inline(always)]
+    pub fn from_ptr(addr: usize) -> Self {
+        Self(addr as u64)
+    }
+    #[inline(always)]
+    pub fn to_ptr(&self) -> usize {
+        self.0 as usize
     }
 
     #[inline(always)]
@@ -184,5 +195,28 @@ impl Value {
             return Err(format!("Shift right by negative integer (left: {lhs}, right: {rhs})"))
         }
         Ok(Self::from_int(lhs.checked_shr(rhs as u32).ok_or(format!("Shift right overflow (left: {lhs}, right: {rhs})"))?))
+    }
+    #[inline(always)]
+    pub fn scon(&self, other: Self, arena: &mut Arena) -> Result<Self, String> {
+        let lhs_addr = self.0 as usize;
+        let rhs_addr = other.0 as usize;
+        let lhs_size = u32::from_le_bytes(
+            arena.fetch(lhs_addr, 4)
+            .try_into()
+            .unwrap()
+        ) as usize;
+        let rhs_size = u32::from_le_bytes(
+            arena.fetch(rhs_addr, 4)
+            .try_into()
+            .unwrap()
+        ) as usize;
+        let new_len = lhs_size + rhs_size;
+        let addr = arena.alloc(new_len + 4, 1);
+        arena.write(addr, &new_len.to_le_bytes());
+        let lhs_data = arena.fetch(lhs_addr + 4, lhs_size).to_vec();
+        arena.write(addr + 4, &lhs_data);
+        let rhs_data = arena.fetch(rhs_addr + 4, rhs_size).to_vec();
+        arena.write(addr + 4 + lhs_size, &rhs_data);
+        Ok(Self::from_ptr(addr))
     }
 }

@@ -233,6 +233,12 @@ pub fn disassemble(bytecode: &[u32]) -> String {
                 let src2 = ((inst >> 24) & 0xFF) as u8;
                 output.push_str(&format!("RSHF r{dest} r{src1} r{src2}\n"));
             },
+            SCON => {
+                let dest = ((inst >> 8) & 0xFF) as u8;
+                let src1 = ((inst >> 16) & 0xFF) as u8;
+                let src2 = ((inst >> 24) & 0xFF) as u8;
+                output.push_str(&format!("SCON r{dest} r{src1} r{src2}\n"));
+            },
             HALT => output.push_str("HALT\n"),
             _ => todo!()
         }

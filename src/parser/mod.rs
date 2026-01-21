@@ -132,6 +132,13 @@ impl<'p> Parser<'p> {
                     span: token.span,
                 })
             },
+            TokenType::StringLit => {
+                self.pos += 1;
+                Ok(ASTNode {
+                    ty: ASTNodeType::StringLit(token.lex.to_string()),
+                    span: token.span,
+                })
+            },
             TokenType::True => {
                 self.pos += 1;
                 Ok(ASTNode {
@@ -214,6 +221,40 @@ impl<'p> Parser<'p> {
         let ident = self.expect(TokenType::Identifier)?;
         let name = ident.lex.to_string();
         stmt_span.end = ident.span.end;
+
+        if self.expect(TokenType::LParen).is_ok() {
+            let mut args = Vec::new();
+            while let Some(tok) = self.tokens.get(self.pos) {
+                if tok.ty == TokenType::RParen { break }
+                let ident = self.expect(TokenType::Identifier)?;
+                let mut arg_span = ident.span;
+                let name = ident.lex.to_string();
+                if self.expect(TokenType::Comma).is_ok() {
+                    let ty = self.parse_type()?;
+                    arg_span.end = ty.span.end;
+                    args.push((name, Some(ty), arg_span));
+                } else {
+                    args.push((name, None, arg_span));
+                }
+                if self.expect(TokenType::Comma).is_err() {
+                    break
+                }
+            }
+            self.expect(TokenType::RParen)?;
+            let return_ty = if self.expect(TokenType::Comma).is_ok() {
+                Some(self.parse_type()?)
+            } else {
+                None
+            };
+            self.expect(TokenType::Operator(Operator::Assign))?;
+            let body = self.parse_expr(0)?;
+            stmt_span.end = body.span.end;
+
+            return Ok(ASTNode {
+                ty: ASTNodeType::FunDef { name, args, return_ty, body: Box::new(body) },
+                span: stmt_span,
+            });
+        }
 
         let ty = if self.expect(TokenType::Colon).is_ok() {
             let expr = self.parse_type()?;

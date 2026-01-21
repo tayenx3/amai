@@ -3,7 +3,6 @@ use crate::common::{Operator, Span};
 use crate::semantic_checker::types::Type;
 use crate::vm::inst::*;
 use crate::parser::ast::*;
-use crate::vm::value::Value;
 
 pub mod value;
 use value::ValueBuilder;
@@ -25,19 +24,9 @@ impl ASTCompiler {
         }
     }
 
-    pub fn constants(&self) -> Box<[Value]> {
-        self.constants
-            .iter()
-            .map(
-                |val_b|
-                Value(val_b.inner)
-            ).collect::<Vec<_>>()
-            .into_boxed_slice()
-    }
-
     fn add_constant(&mut self, c: ValueBuilder) -> u16 {
         if !self.constants.contains(&c) {
-            self.constants.push(c);
+            self.constants.push(c.clone());
         }
         self.constants.iter().position(|s| *s == c).unwrap() as u16
     }
@@ -45,7 +34,7 @@ impl ASTCompiler {
     pub fn compile(&mut self, ast: &ASTModule) -> Vec<(u32, Span)> {
         let mut func = Vec::new();
         for node in &ast.nodes {
-            unsafe { self.compile_node(node, &mut func, 0) };
+            self.compile_node(node, &mut func, 0);
         }
         func
     }
@@ -61,30 +50,34 @@ impl ASTCompiler {
         s.0[&format!("{n}_{}", s.2)]
     }
 
-    #[allow(unsafe_op_in_unsafe_fn)]
-    unsafe fn compile_node(&mut self, node: &ASTNode, output_buf: &mut Vec<(u32, Span)>, dest: u8) {
+    fn compile_node(&mut self, node: &ASTNode, output_buf: &mut Vec<(u32, Span)>, dest: u8) {
         match &node.ty {
             ASTNodeType::IntLit(n) => {
-                let const_id = self.add_constant(ValueBuilder::from_int(*n));
+                let const_id = self.add_constant(ValueBuilder::Int(*n));
                 output_buf.push((LOAD as u32 | ((dest as u32) << 8) | ((const_id as u32) << 16), node.span));
             },
             ASTNodeType::FloatLit(n) => {
-                let const_id = self.add_constant(ValueBuilder::from_float(*n));
+                let const_id = self.add_constant(ValueBuilder::Float(*n));
                 output_buf.push((LOAD as u32 | ((dest as u32) << 8) | ((const_id as u32) << 16), node.span));
             },
+            ASTNodeType::StringLit(n) => {
+                let chars = n.as_bytes();
+                let const_id = self.add_constant(ValueBuilder::String(chars.to_vec()));
+                output_buf.push((LOAD as u32 | ((dest as u32) << 8) | ((const_id as u32) << 16), node.span));
+            }
             ASTNodeType::Boolean(n) => {
-                let const_id = self.add_constant(ValueBuilder::from_bool(*n));
+                let const_id = self.add_constant(ValueBuilder::Bool(*n));
                 output_buf.push((LOAD as u32 | ((dest as u32) << 8) | ((const_id as u32) << 16), node.span));
             },
             ASTNodeType::Identifier(n) => output_buf.push((MOVE as u32 | ((dest as u32) << 8) | ((self.get_var(n) as u32) << 16), node.span)),
             ASTNodeType::Semi(stmt) => self.compile_node(stmt, output_buf, 0),
             ASTNodeType::Unit => {
-                let const_id = self.add_constant(ValueBuilder::unit());
+                let const_id = self.add_constant(ValueBuilder::Unit);
                 output_buf.push((LOAD as u32 | ((dest as u32) << 8) | ((const_id as u32) << 16), node.span));
             },
             ASTNodeType::Block(stmts) => {
                 if stmts.len() == 0 {
-                    let const_id = self.add_constant(ValueBuilder::unit());
+                    let const_id = self.add_constant(ValueBuilder::Unit);
                     output_buf.push((LOAD as u32 | ((dest as u32) << 8) | ((const_id as u32) << 16), node.span));
                     return;
                 }
@@ -114,7 +107,7 @@ impl ASTCompiler {
                         self.compile_node(rhs, output_buf, 0);
                         output_buf.push((MOVE as u32 | ((reg as u32) << 8), node.span));
 
-                        let const_id = self.add_constant(ValueBuilder::unit());
+                        let const_id = self.add_constant(ValueBuilder::Unit);
                         output_buf.push((LOAD as u32 | ((dest as u32) << 8) | ((const_id as u32) << 16), node.span));
                         return;
                     }
@@ -128,7 +121,7 @@ impl ASTCompiler {
                             _ => unreachable!(),
                         }
 
-                        let const_id = self.add_constant(ValueBuilder::unit());
+                        let const_id = self.add_constant(ValueBuilder::Unit);
                         output_buf.push((LOAD as u32 | ((dest as u32) << 8) | ((const_id as u32) << 16), node.span));
                         return;
                     }
@@ -142,7 +135,7 @@ impl ASTCompiler {
                             _ => unreachable!(),
                         }
 
-                        let const_id = self.add_constant(ValueBuilder::unit());
+                        let const_id = self.add_constant(ValueBuilder::Unit);
                         output_buf.push((LOAD as u32 | ((dest as u32) << 8) | ((const_id as u32) << 16), node.span));
                         return;
                     }
@@ -156,7 +149,7 @@ impl ASTCompiler {
                             _ => unreachable!(),
                         }
 
-                        let const_id = self.add_constant(ValueBuilder::unit());
+                        let const_id = self.add_constant(ValueBuilder::Unit);
                         output_buf.push((LOAD as u32 | ((dest as u32) << 8) | ((const_id as u32) << 16), node.span));
                         return;
                     }
@@ -170,7 +163,7 @@ impl ASTCompiler {
                             _ => unreachable!(),
                         }
 
-                        let const_id = self.add_constant(ValueBuilder::unit());
+                        let const_id = self.add_constant(ValueBuilder::Unit);
                         output_buf.push((LOAD as u32 | ((dest as u32) << 8) | ((const_id as u32) << 16), node.span));
                         return;
                     }
@@ -184,7 +177,7 @@ impl ASTCompiler {
                             _ => unreachable!(),
                         }
 
-                        let const_id = self.add_constant(ValueBuilder::unit());
+                        let const_id = self.add_constant(ValueBuilder::Unit);
                         output_buf.push((LOAD as u32 | ((dest as u32) << 8) | ((const_id as u32) << 16), node.span));
                         return;
                     }
@@ -241,6 +234,7 @@ impl ASTCompiler {
                         Type::Float => output_buf.push((FCLE as u32 | ((dest as u32) << 8) | 0x10000 | 0x2000000, node.span)),
                         _ => unreachable!(),
                     },
+                    Operator::Concat => output_buf.push((SCON as u32 | ((dest as u32) << 8) | 0x10000 | 0x2000000, node.span)),
                     Operator::LogOr => output_buf.push((LOR as u32 | ((dest as u32) << 8) | 0x10000 | 0x2000000, node.span)),
                     Operator::LogAnd => output_buf.push((LAND as u32 | ((dest as u32) << 8) | 0x10000 | 0x2000000, node.span)),
                     Operator::Pipe => output_buf.push((BOR as u32 | ((dest as u32) << 8) | 0x10000 | 0x2000000, node.span)),
@@ -322,6 +316,7 @@ impl ASTCompiler {
                 let jump_to_cond_eval = -(compiled_body.len() as i16 + compiled_condition.len() as i16 + 1);
                 output_buf.push((JUMP as u32 | ((jump_to_cond_eval as u32) << 8), node.span));
             },
+            ASTNodeType::FunDef { name, args, return_ty, body } => {},
         }
     }
 }
