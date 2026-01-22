@@ -33,24 +33,25 @@ impl ASTCompiler {
 
     pub fn compile(&mut self, ast: &ASTModule) -> (usize, Vec<FunctionBuilder>) {
         for node in &ast.nodes {
+            self.collect_functions_sig(node);
+        }
+        for node in &ast.nodes {
             self.compile_node(node, &mut Vec::new(), 0);
         }
         let main_id = self.get_func("@main_0");
         (main_id, self.functions.clone())
     }
 
-    fn collect_functions(&mut self, node: &ASTNode) {
+    fn collect_functions_body(&mut self, node: &ASTNode) {
         match &node.ty {
             ASTNodeType::FunDef { name, params, body, .. } => {
-                self.current_function = self.functions.len();
-                let mut registers: [ValueBuilder; 64] = std::array::from_fn(|_| ValueBuilder::Unit);
-                registers[3] = ValueBuilder::Function(self.current_function);
                 let scope = self.functions.last_mut()
                     .map(|func| func.current_scope_id)
                     .unwrap_or(0);
-                self.functions.push(FunctionBuilder::new(&format!("@{name}_{scope}"), registers));
+                self.current_function = self.get_func(&format!("@{name}_{scope}"));
                 self.functions
-                    .last_mut()
+                    .iter_mut()
+                    .find(|f| f.name == format!("@{name}_{scope}"))
                     .unwrap()
                     .scope.last_mut()
                     .unwrap().0
@@ -66,7 +67,11 @@ impl ASTCompiler {
                 }
                 self.compile_node(body, &mut output_buf, 0);
                 output_buf.push((PARG as u32, Span { start: 0, end: 0 })); // PARG does not create runtime errors (that im aware of)
-                self.functions.last_mut().unwrap().body = output_buf;
+                output_buf.push((RETN as u32, Span { start: 0, end: 0 }));
+                self.functions
+                    .iter_mut()
+                    .find(|f| f.name == format!("@{name}_{scope}"))
+                    .unwrap().body = output_buf;
             },
             _ => {},
         }
@@ -76,8 +81,29 @@ impl ASTCompiler {
         self.functions.iter().position(|f| f.name == callee).unwrap()
     }
 
+    fn collect_functions_sig(&mut self, node: &ASTNode) {
+        match &node.ty {
+            ASTNodeType::FunDef { name, .. } => {
+                let mut registers: [ValueBuilder; 64] = std::array::from_fn(|_| ValueBuilder::Unit);
+                registers[3] = ValueBuilder::Function(self.current_function);
+                let scope = self.functions.last_mut()
+                    .map(|func| func.current_scope_id)
+                    .unwrap_or(0);
+                self.functions.push(FunctionBuilder::new(&format!("@{name}_{scope}"), registers));
+                self.functions
+                    .last_mut()
+                    .unwrap()
+                    .scope.last_mut()
+                    .unwrap().0
+                    .insert(format!("@{name}_{scope}"), 3);
+            },
+            ASTNodeType::Semi(s) => self.collect_functions_sig(s),
+            _ => {},
+        }
+    }
+
     fn compile_node(&mut self, node: &ASTNode, output_buf: &mut Vec<(u32, Span)>, dest: u8) {
-        self.collect_functions(node);
+        self.collect_functions_body(node);
         match &node.ty {
             ASTNodeType::IntLit(n) => {
                 let const_id = self.add_constant(ValueBuilder::Int(*n));

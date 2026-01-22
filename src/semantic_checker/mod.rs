@@ -116,7 +116,7 @@ impl SemanticChecker {
         }
     }
     
-    fn collect_functions(&mut self, node: &ASTNode) -> Result<(), Diagnostic> {
+    fn collect_function(&mut self, node: &ASTNode) -> Result<(), Diagnostic> {
         match &node.ty {
             ASTNodeType::FunDef { name, params, return_ty, body: _ } => {
                 let mut params_ty = Vec::new();
@@ -134,12 +134,37 @@ impl SemanticChecker {
 
         Ok(())
     }
+    fn collect_function_deep(&mut self, node: &ASTNode) -> Result<(), Diagnostic> {
+        match &node.ty {
+            ASTNodeType::FunDef { name, params, return_ty, body: _ } => {
+                let mut params_ty = Vec::new();
+                for (_, ty, _) in params {
+                    params_ty.push(self.resolve_type(ty)?);
+                }
+                let return_ty = match return_ty {
+                    Some(ty) => Box::new(self.resolve_type(ty)?),
+                    None => Box::new(Type::Unit),
+                };
+                self.define_symbol(name, Type::Func(params_ty, return_ty), false, false, node.span);
+            },
+            ASTNodeType::Semi(s) => self.collect_function_deep(s)?,
+            _ => {},
+        }
+
+        Ok(())
+    }
 
     pub fn validate(&mut self, ast: &mut ASTModule) -> Result<(), Vec<Diagnostic>> {
         let mut diagnostics = Vec::new();
 
+        for node in &ast.nodes {
+            if let Err(diag) = self.collect_function_deep(node) {
+                diagnostics.push(diag);
+            }
+        }
+
         for node in &mut ast.nodes {
-            if let Err(diag) = self.validate_node(node, false) {
+            if let Err(diag) = self.validate_node(node, false, false) {
                 diagnostics.extend(diag);
             }
         }
@@ -151,8 +176,10 @@ impl SemanticChecker {
         Ok(())
     }
 
-    pub fn validate_node(&mut self, node: &mut ASTNode, force_exhaustive: bool) -> Result<Type, Vec<Diagnostic>> {
-        self.collect_functions(node).map_err(|err| vec![err])?;
+    pub fn validate_node(&mut self, node: &mut ASTNode, force_exhaustive: bool, recollect: bool) -> Result<Type, Vec<Diagnostic>> {
+        if recollect {
+            self.collect_function(node).map_err(|err| vec![err])?;
+        }
         match &mut node.ty {
             ASTNodeType::IntLit(_) => Ok(Type::Int),
             ASTNodeType::FloatLit(_) => Ok(Type::Float),
@@ -163,14 +190,17 @@ impl SemanticChecker {
                 .map(|sy| sy.ty.clone())
                 .map_err(|err| vec![err]),
             ASTNodeType::Semi(stmt) => {
-                self.validate_node(stmt, false)?;
+                self.validate_node(stmt, false, true)?;
                 Ok(Type::Unit)
             },
             ASTNodeType::Block(stmts) => {
                 let mut last_ty = Type::Unit;
 
+                for stmt in &*stmts {
+                    self.collect_function_deep(stmt).map_err(|err| vec![err])?;
+                }
                 for stmt in stmts {
-                    last_ty = self.validate_node(stmt, false)?;
+                    last_ty = self.validate_node(stmt, false, false)?;
                 }
 
                 Ok(last_ty)
@@ -188,7 +218,7 @@ impl SemanticChecker {
                 {
                     match &lhs.ty {
                         ASTNodeType::Identifier(s) => {
-                            let rhs_ty = self.validate_node(rhs, true)?;
+                            let rhs_ty = self.validate_node(rhs, true, true)?;
                             self.mutate_symbol(s, &rhs_ty, node.span.clone()).map_err(|err| vec![err])?;
                             let sym = self
                                 .find_symbol(s, node.span)
@@ -216,8 +246,8 @@ impl SemanticChecker {
                     }
                 }
                 
-                let lhs_ty = self.validate_node(lhs, true)?;
-                let rhs_ty = self.validate_node(rhs, true)?;
+                let lhs_ty = self.validate_node(lhs, true, true)?;
+                let rhs_ty = self.validate_node(rhs, true, true)?;
 
                 if let Some(output) = op.infix_output(&lhs_ty, &rhs_ty) {
                     *op_tys = Some((lhs_ty, rhs_ty));
@@ -238,7 +268,7 @@ impl SemanticChecker {
                 }
             },
             ASTNodeType::UnaryOp { op, operand, op_ty} => {
-                let operand_ty = self.validate_node(operand, true)?;
+                let operand_ty = self.validate_node(operand, true, true)?;
 
                 if let Some(output) = op.prefix_output(&operand_ty) {
                     *op_ty = Some(operand_ty);
@@ -264,7 +294,7 @@ impl SemanticChecker {
                     Type::Unknown
                 };
                 if let Some(i) = init {
-                    let init_ty = self.validate_node(i, true)?;
+                    let init_ty = self.validate_node(i, true, true)?;
                     if var_ty == Type::Unknown {
                         var_ty = init_ty.clone();
                     }
@@ -307,7 +337,7 @@ impl SemanticChecker {
                     Type::Unknown
                 };
                 if let Some(i) = init {
-                    let init_ty = self.validate_node(i, true)?;
+                    let init_ty = self.validate_node(i, true, true)?;
                     if var_ty == Type::Unknown {
                         var_ty = init_ty.clone();
                     }
@@ -345,7 +375,7 @@ impl SemanticChecker {
             },
             ASTNodeType::If { condition, then_body, else_body } => {
                 let mut errors = Vec::new();
-                let _ = self.validate_node(condition, true)
+                let _ = self.validate_node(condition, true, true)
                     .inspect_err(|err| errors.extend(err.clone()))
                     .inspect(
                         |ty| if *ty != Type::Bool {
@@ -359,10 +389,10 @@ impl SemanticChecker {
                         }
                     );
 
-                let then_body_ty = self.validate_node(then_body, force_exhaustive)?;
+                let then_body_ty = self.validate_node(then_body, force_exhaustive, true)?;
                 if force_exhaustive {
                     if let Some(else_body) = else_body {
-                        let else_body_ty = self.validate_node(else_body, force_exhaustive)?;
+                        let else_body_ty = self.validate_node(else_body, force_exhaustive, true)?;
 
                         if else_body_ty != then_body_ty {
                             errors.push(
@@ -398,7 +428,7 @@ impl SemanticChecker {
             },
             ASTNodeType::While { condition, body } => {
                 let mut errors = Vec::new();
-                let cond_ty = self.validate_node(condition, true)?;
+                let cond_ty = self.validate_node(condition, true, true)?;
                 if cond_ty != Type::Bool {
                     errors.push(
                         Diagnostic::new(
@@ -410,7 +440,7 @@ impl SemanticChecker {
                 }
 
                 self.symbols.push(HashMap::new());
-                let _ = self.validate_node(body, force_exhaustive).inspect_err(|err| errors.extend_from_slice(err.as_slice()));
+                let _ = self.validate_node(body, force_exhaustive, true).inspect_err(|err| errors.extend_from_slice(err.as_slice()));
                 if !errors.is_empty() { return Err(errors) }
                 self.symbols.pop();
                 Ok(Type::Unit)
@@ -427,7 +457,7 @@ impl SemanticChecker {
                         });
                 }
                 self.symbols.push(scope);
-                let body_ty = self.validate_node(body, true)?;
+                let body_ty = self.validate_node(body, true, true)?;
                 let return_ty = return_ty.as_ref()
                     .map(|ty| self.resolve_type(ty))
                     .unwrap_or(Ok(Type::Unit))
@@ -450,7 +480,7 @@ impl SemanticChecker {
                 let symbol = self.find_symbol(&callee, node.span).map_err(|err| vec![err])?.clone();
                 if let Type::Func(params_ty, ty) = symbol.ty {
                     for (i, arg) in args.iter_mut().enumerate() {
-                        let arg_ty = self.validate_node(arg, true)?;
+                        let arg_ty = self.validate_node(arg, true, true)?;
                         if params_ty[i] != arg_ty {
                             return Err(vec![Diagnostic::new(
                                 self.path.display(),

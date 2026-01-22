@@ -122,6 +122,7 @@ impl AmaiVM {
     #[inline(always)]
     #[allow(unsafe_op_in_unsafe_fn)]
     pub unsafe fn cycle(&mut self) -> Result<(), (String, Span)> {
+        if self.frames.is_empty() { self.running = false; return Ok(()) }
         let frame = self.frames.last_mut().unwrap() as *mut CallFrame;
         let (inst, span) = if let Some(inst) = (&(*frame).function).bytecode.get((*frame).ip) {
             inst
