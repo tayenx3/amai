@@ -106,7 +106,7 @@ impl AmaiVM {
         let opcode = (inst & 0xFF) as u8;
 
         match opcode {
-            NOP => {},
+            HALT => self.running = false,
             LOAD => {
                 let dest = ((inst >> 8) & 0xFF) as u8;
                 let id = ((inst >> 16) & 0xFFFF) as u16;
@@ -377,7 +377,6 @@ impl AmaiVM {
 
                 (*frame).registers[((inst >> 8) & 0xFF) as usize] = src1.scne(src2, &mut self.arena);
             },
-            HALT => self.running = false,
             _ => panic!("Unknown opcode: {opcode:#04X}"),
         }
 

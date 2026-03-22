@@ -257,15 +257,7 @@ impl SemanticChecker {
                 )])
             },
             ASTNodeType::BinaryOp { op, lhs, rhs, op_tys } => if self.context != Context::Root {
-                if [
-                    Operator::Assign,
-                    Operator::PlusAssign,
-                    Operator::MinusAssign,
-                    Operator::StarAssign,
-                    Operator::SlashAssign,
-                    Operator::ModuloAssign
-                    ].contains(op)
-                {
+                if *op == Operator::Assign {
                     match &lhs.ty {
                         ASTNodeType::Identifier(s) => {
                             let rhs_ty = self.validate_node(rhs, true, true)?;

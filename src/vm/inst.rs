@@ -1,4 +1,4 @@
-pub const NOP: u8  = 0x00;
+pub const HALT: u8 = 0x00;
 pub const LOAD: u8 = 0x01;
 pub const IADD: u8 = 0x02;
 pub const ISUB: u8 = 0x03;
@@ -43,4 +43,3 @@ pub const RSHF: u8 = 0x29;
 pub const SCON: u8 = 0x2A;
 pub const SCEQ: u8 = 0x2B;
 pub const SCNE: u8 = 0x2C;
-pub const HALT: u8 = 0xFF;

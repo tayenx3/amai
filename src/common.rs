@@ -4,10 +4,8 @@ use crate::semantic_checker::types::Type;
 pub(crate) enum Operator {
     Plus, Minus, Star, Slash, Modulo,
     Assign,
-    PlusAssign, MinusAssign, StarAssign, SlashAssign, ModuloAssign,
     Eq, Ne, Gt, Lt, Ge, Le,
     Concat,
-    Range, RangeInclus,
     Tilde,
     LogOr, LogAnd, Bang,
     Pipe, Ampersand, Caret,
@@ -17,10 +15,9 @@ pub(crate) enum Operator {
 impl Operator {
     pub(crate) fn precedence(&self) -> (u32, u32) {
         match self {
-            Operator::Star | Operator::Slash | Operator::Modulo => (120, 121),
-            Operator::Plus | Operator::Minus => (110, 111),
-            Operator::Lsh | Operator::Rsh => (100, 101),
-            Operator::Range | Operator::RangeInclus => (90, 91),
+            Operator::Star | Operator::Slash | Operator::Modulo => (110, 111),
+            Operator::Plus | Operator::Minus => (100, 101),
+            Operator::Lsh | Operator::Rsh => (90, 91),
             Operator::Gt | Operator::Lt | Operator::Ge | Operator::Le => (80, 81),
             Operator::Eq | Operator::Ne => (70, 71),
             Operator::Ampersand => (60, 61),
@@ -49,11 +46,6 @@ impl Operator {
             Operator::Slash => "/",
             Operator::Modulo => "%",
             Operator::Assign => "=",
-            Operator::PlusAssign => "+=",
-            Operator::MinusAssign => "-=",
-            Operator::StarAssign => "*=",
-            Operator::SlashAssign => "/=",
-            Operator::ModuloAssign => "%=",
             Operator::Eq => "==",
             Operator::Ne => "!=",
             Operator::Gt => ">",
@@ -61,8 +53,6 @@ impl Operator {
             Operator::Ge => ">=",
             Operator::Le => "<=",
             Operator::Concat => "++",
-            Operator::Range => "..",
-            Operator::RangeInclus => "..=",
             Operator::Tilde => "~",
             Operator::LogOr => "||",
             Operator::LogAnd => "&&",
@@ -103,19 +93,12 @@ impl Operator {
             } else {
                 None
             },
-            Operator::Range | Operator::RangeInclus => if let (Type::Int, Type::Int) = (lhs, rhs) {
-                Some(Type::Vector(Box::new(Type::Int)))
-            } else {
-                None
-            },
             Operator::LogOr | Operator::LogAnd => if let (Type::Bool, Type::Bool) = (lhs, rhs) {
                 Some(Type::Bool)
             } else {
                 None
             },
-            Operator::Assign | Operator::PlusAssign
-            | Operator::MinusAssign | Operator::StarAssign
-            | Operator::SlashAssign | Operator::ModuloAssign => unreachable!("Assignations should be handled separately"),
+            Operator::Assign => unreachable!("Assignations should be handled separately"),
             Operator::Eq | Operator::Ne => if lhs == rhs {
                 Some(Type::Bool)
             } else {

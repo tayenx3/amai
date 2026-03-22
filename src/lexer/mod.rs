@@ -4,10 +4,9 @@ use token::*;
 use crate::{common::{Operator, Span}, diagnostic::Diagnostic};
 
 const MULTICHAR_SYMBOLS: &[&str] = &[
-    "+=", "-=", "*=", "/=", "%=",
     "==", "!=", ">=", "<=",
-    "||", "&&", "..", "..=",
-    "<<", ">>", "++", "->",
+    "||", "&&", "<<", ">>",
+    "++", "->",
 ];
 
 fn parse_int(string: &str) -> Option<i64> {
@@ -94,11 +93,6 @@ fn classify<'lex>(lex: &'lex str, span: Span) -> Option<Token<'lex>> {
         "/" => (TokenType::Operator(Operator::Slash), None),
         "%" => (TokenType::Operator(Operator::Modulo), None),
         "=" => (TokenType::Operator(Operator::Assign), None),
-        "+=" => (TokenType::Operator(Operator::PlusAssign), None),
-        "-=" => (TokenType::Operator(Operator::MinusAssign), None),
-        "*=" => (TokenType::Operator(Operator::StarAssign), None),
-        "/=" => (TokenType::Operator(Operator::SlashAssign), None),
-        "%=" => (TokenType::Operator(Operator::ModuloAssign), None),
         "==" => (TokenType::Operator(Operator::Eq), None),
         "!=" => (TokenType::Operator(Operator::Ne), None),
         ">" => (TokenType::Operator(Operator::Gt), None),
@@ -112,8 +106,6 @@ fn classify<'lex>(lex: &'lex str, span: Span) -> Option<Token<'lex>> {
         "^" => (TokenType::Operator(Operator::Caret), None),
         "~" => (TokenType::Operator(Operator::Tilde), None),
         "!" => (TokenType::Operator(Operator::Bang), None),
-        ".." => (TokenType::Operator(Operator::Range), None),
-        "..=" => (TokenType::Operator(Operator::RangeInclus), None),
         "<<" => (TokenType::Operator(Operator::Lsh), None),
         ">>" => (TokenType::Operator(Operator::Rsh), None),
         "++" => (TokenType::Operator(Operator::Concat), None),

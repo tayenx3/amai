@@ -8,7 +8,9 @@ mod cli;
 mod diagnostic;
 mod tools;
 
-use crate::cli::{Cli, Command};
+use cli::{Cli, Command};
+use codegen::ASTCompiler;
+use vm::AmaiVM;
 use colored::Colorize;
 
 fn main() {
@@ -70,6 +72,28 @@ pub fn run_path(input: &str, show_bytecode: bool) -> Result<(), String> {
             .map(|d| d.display(&line_starts, &lines))
             .collect::<Vec<_>>().join("\n")
     })?;
+
+    let mut astc = ASTCompiler::new();
+    astc.compile(&ast);
+
+    let mut vm = AmaiVM::new(false);
+    for f in astc.functions {
+        if f.bytecode.len() < 65536 {
+            vm.allow_large_bytecode = true;
+        }
+
+        let mut registers = Vec::new();
+
+        for v in f.registers {
+            if v.is_large() {
+                todo!("Large objects")
+            } else {
+                registers.push(v.to_value());
+            }
+        }
+    
+        vm.add_function(f.bytecode.into_boxed_slice(), &registers);
+    }
 
     Ok(())
 }
