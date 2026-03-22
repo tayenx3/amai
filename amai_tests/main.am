@@ -1,0 +1,4 @@
+let main () = {
+    let add (x: int, y: int): int = x + y;
+    let result: int = add (5, 3);
+}

@@ -1,0 +1,19 @@
+let main() = {
+    let x = 10;
+    x = "s";
+}
+
+-- this should error like:
+{-
+error: Variable `x` is defined as `int` but found `string`
+  ┌── amai_tests/type_conflict.am:3:5
+  │
+3 │     x = "s";
+  │     ^^^^^^^
+  │
+Variable was defined here:
+  │
+2 │     let x = 10;
+  │     ^^^^^^^^^^
+  │
+-}

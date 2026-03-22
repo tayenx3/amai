@@ -1,0 +1,12 @@
+let is_even(n: int): bool =
+    if n == 0 then true
+    else is_odd(n - 1)
+
+let is_odd(n: int): bool =
+    if n == 0 then false
+    else is_even(n - 1)
+
+let main() = {
+    let x = is_odd(2);
+    if x then while true do {}
+}
